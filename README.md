@@ -59,7 +59,7 @@ You can also  override slope and roadtype:
 . check 'Manual'
 . choose roadtype, intensity and slope
 
-In gtacx.py you can schoose the language of buttons,e.g.:
+In gtacx.py you can choose the language of buttons,e.g.:
 butnames=butnames_en
 
 Available: English, Dutch.
