@@ -27,7 +27,10 @@ def get_val_int(srch,stri,ival):
   if (stri.find(srch+'=')>=0):
     val=stri.split(srch+'=')
     val=val[1].split(',')
-    ival=int(val[0])
+    if (val[0]=="None"):
+      ival=0
+    else:
+      ival=int(val[0])
   return ival
 
 def get_val_flt(srch,stri,fval):

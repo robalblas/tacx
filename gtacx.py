@@ -169,7 +169,7 @@ def overbr(speed,cadence):
   return float(speed*1000/60/wielomtrek/float(cadence))
 
 show_accupow=False
-show_hart=True
+show_hart=False
 ########## Print position in gui ##########
 def show_pos(tacx_data,point):
   speed=tacx_misc.tacx_data.speed
