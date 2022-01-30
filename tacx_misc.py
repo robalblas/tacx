@@ -1,3 +1,6 @@
+######################################################################################
+# misc. functions 
+######################################################################################
 debug=False
 import sys
 import select
@@ -20,8 +23,11 @@ class RoadSurface(Enum):
 class from_tacx:
   def __init__(self):
     self.distance=0
-    self.pdistance=0
     self.speed=0
+    self.cadence=0
+    self.accu_pow=0
+    self.inst_pow=0
+    self.heart=0
     self.new_data=False
 
 class guivars:
@@ -33,6 +39,7 @@ class guivars:
     self.w24=None
     self.w25=None
     self.w26=None
+    self.w27=None
     self.cvs=None
     self.cvs_width=0
     self.cvs_height=0
@@ -41,10 +48,12 @@ class guivars:
     self.loladmax=0.0
     self.curpos=(0,0)
     self.mark
-    self.curval=0
+    self.add_dist=0
 
+########## Initialize global vars ##########
 def init_globs():
-    global running,pauze,offset,tacx_data,man_roadsurface
+    global pauze,running,offset,tacx_data
+    global man_roadsurface,man_roadsurface_type,man_roadsurface_intensity,man_slope
     pauze=False
     running=False
     offset=0
@@ -52,11 +61,14 @@ def init_globs():
     man_roadsurface=False
     man_roadsurface_type=RoadSurface.SIMULATION_OFF
     man_roadsurface_intensity=20
+    man_slope=0
 
+########## Print if in debug mode ##########
 def pri_dbg(s):
   if (debug):
     print(s)
 
+########## Detect press of enter ##########
 def heardEnter():
   i,o,e = select.select([sys.stdin],[],[],0.0001)
   for s in i:

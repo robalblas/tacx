@@ -1,3 +1,7 @@
+######################################################################################
+# gpx and road type related functions
+######################################################################################
+#
 import os.path
 from os import path
 
@@ -11,6 +15,7 @@ import tacx_misc
 from tacx_misc import pri_dbg
 from tacx_misc import RoadSurface
 
+########## Track point including road type ##########
 class punt:
   def __init__(self):
     self.lon=0.
@@ -20,6 +25,8 @@ class punt:
     self.slope=0.
     self.RoadSurface=RoadSurface.SIMULATION_OFF
     self.RoadSurface_intensity=0
+    self.pos_valid=True
+    self.end_track=False
     self.next=None
     self.prev=None
 
@@ -34,11 +41,7 @@ class punten:
         yield node
         node = node.next
 
-class punt1:
-  def __init__(self):
-    self.punt.lon=0.
-    self.punt.lat=0.
-
+########## set of points for one road type piece
 class wpunt:
   def __init__(self):
     self.pa=punt()
@@ -54,8 +57,8 @@ class wegpunten:
   def __iter__(self):
     node = self.head
     while node is not None:
-        yield node
-        node = node.next
+      yield node
+      node = node.next
 
 # relative distance between pa and pb, return: 0.5 = small distance
 def get_dist(pa,pb):
@@ -186,7 +189,7 @@ def add_road(wl,pa,pi,pb):
   npunt=wpunt()
   if (wl.head==None):
     wl.head=npunt
-  
+
   npunt.pa=pa
   npunt.pi=pi
   npunt.pb=pb
@@ -207,11 +210,21 @@ def get_one_roadpunt(s1,s2,p):
   ss=s2.split('=')
   sss=ss[1].split('/')
   p.RoadSurface=transl_roadsurface(sss[0])
+  print(sss)
 
   if (len(sss)>1):
     p.RoadSurface_intensity=int(sss[1])
-#  print("Roadtype " + str(p.RoadSurface) + "intensity=" + str(p.RoadSurface_intensity))
-  
+
+def get_one_roadpos(s1,s2,p):
+  ss=s1.split('=')
+  p.dist=int(ss[1])
+  ss=s2.split('=')
+  sss=ss[1].split('/')
+  p.RoadSurface=transl_roadsurface(sss[0])
+
+  if (len(sss)>1):
+    p.RoadSurface_intensity=int(sss[1])
+
 # pa=<lat>,<lon> ra=<wegtype>[/n] pi=... pb=..
 def parse_roadtype(fp,weglist):
   while True:    
@@ -224,10 +237,14 @@ def parse_roadtype(fp,weglist):
       pa=punt()
       pi=punt()
       pb=punt()
-      get_one_roadpunt(s[0],s[1],pa)   # start
-      get_one_roadpunt(s[2],s[3],pi)   # halfway
-      get_one_roadpunt(s[4],s[5],pb)   # end
-      add_road(weglist,pa,pi,pb)
+      if (line[1]=='d'):
+        get_one_roadpos(s[0],s[1],pa)   # position
+        add_road(weglist,pa,None,None)
+      else:
+        get_one_roadpunt(s[0],s[1],pa)   # start
+        get_one_roadpunt(s[2],s[3],pi)   # halfway
+        get_one_roadpunt(s[4],s[5],pb)   # end
+        add_road(weglist,pa,pi,pb)
 
 #    print(str(n) + "  dist= " + str(p1.dist) + "   weg= " + str(p1.RoadSurface) + "  dista= " + str(get_dist(pa,p1)) + "  distb= " + str(get_dist(pb,p1)))
 
@@ -242,8 +259,9 @@ def pri_roadinfo(gpx_list,fn):
     p = p.next
   fp.close()
 
-# Add road types defined in wfn to gpxlist
-def add_roadtype(gpx_list,wfn):
+
+# Add road types defined in wfn to gpxlist, use locations
+def add_roadtype1(gpx_list,wfn):
   if (wfn==None):
     return
   
@@ -252,13 +270,18 @@ def add_roadtype(gpx_list,wfn):
     fp = open(wfn, 'r')
   
   parse_roadtype(fp,weglist)
-  fp.close()
-  pri_dbg("Add road type...")
+  gpx_list.roadsurface_changes=weglist
 
+  fp.close()
+  pri_dbg("Add road type1...")
+
+  p1=None
   for wl in weglist:
     pa=wl.pa
     pi=wl.pi
     pb=wl.pb
+    if (pi==None):
+      continue
 
     p1=gpx_list.head
     while p1 is not None:
@@ -273,6 +296,9 @@ def add_roadtype(gpx_list,wfn):
 
   # evt. aanvullen tot einde? Moet pb.RoadSurface of pa.RoadSurface gebruiken!
   while p1 is not None:
+    if (pb==None):
+      p1 = p1.next
+      continue
     p1.RoadSurface=pb.RoadSurface
     p1.RoadSurface_intensity=pb.RoadSurface_intensity
     p1 = p1.next
@@ -283,7 +309,37 @@ def add_roadtype(gpx_list,wfn):
       p1.RoadSurface=RoadSurface.SIMULATION_OFF
     p1 = p1.next
 
-#  pri_roadinfo(gpx_list,"weg_info.txt")
+# Add road types defined in wfn to gpxlist, use dist
+def add_roadtype2(gpx_list,wfn):
+  if (wfn==None):
+    return
+  
+  weglist=wegpunten()
+  if (path.exists(wfn)):
+    fp = open(wfn, 'r')
+  
+  parse_roadtype(fp,weglist)
+  gpx_list.roadsurface_changes=weglist
+
+  fp.close()
+  pri_dbg("Add road type2...")
+
+  wl=weglist.head
+  if (wl.pb!=None):
+    return
+  p1=gpx_list.head
+  while p1 is not None:
+    p1.RoadSurface=wl.pa.RoadSurface;
+    p1.RoadSurface_intensity=wl.pa.RoadSurface_intensity
+    if ((wl.next!=None) and (p1.dist > wl.next.pa.dist)):
+      wl=wl.next
+    p1 = p1.next
+
+
+# Add road types defined in wfn to gpxlist
+def add_roadtype(gpx_list,wfn):
+  add_roadtype1(gpx_list,wfn)
+  add_roadtype2(gpx_list,wfn)
 
 # calc. slope using aerage between 2 points with minimum distance of 'mdist'
 def calc_slope(gpx_list):
@@ -361,12 +417,16 @@ def get_gpx(fn,tnr=0):
 
 # goto position in gpx_list closest to 'dist'
 # Interpolate between pos. < dist and > dist
+# Not found or no list: return empty 'punt'
 def goto_pos(gpx_list,dist):
+  pn=punt()
+  pn.pos_valid=False
   if (gpx_list==None):
-    return None
+    return pn
+
   ok=False
-  p2=punt()
   pr=punt()
+  p2=punt()
   for p1 in gpx_list:
     if (p1.dist>dist):
       ok=True
@@ -388,4 +448,15 @@ def goto_pos(gpx_list,dist):
   if (ok):
     return pr
   else:
-    return None
+    pn.end_track=True
+    return pn
+
+def make_track(fn_gpx,fn_wtype):
+  gpx_list=None
+  if (fn_gpx != None):
+    gpx_list=get_gpx(fn_gpx)
+    if (fn_wtype != None):
+      add_roadtype(gpx_list,fn_wtype)
+    else:
+      gpx_list.roadsurface_changes=None
+  return gpx_list

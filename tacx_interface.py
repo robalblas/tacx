@@ -1,3 +1,7 @@
+######################################################################################
+# TACX interface functions
+######################################################################################
+#
 from tacx_misc import pri_dbg, from_tacx
 # extract distance and speed from tacx
 # format in 'str': distance_travelled=123, speed=4.5
@@ -6,8 +10,8 @@ from tacx_misc import pri_dbg, from_tacx
 #class from_tacx:
 #  def __init__(self):
 #    self.distance=0
-#    self.pdistance=0
 #    self.speed=0
+#    self.cadence=0
 #    self.new_data=False
 
 
@@ -19,12 +23,25 @@ from tacx_misc import pri_dbg, from_tacx
 #  ndist
 #  startdist
 #  reset
+def get_val_int(srch,stri,ival):
+  if (stri.find(srch+'=')>=0):
+    val=stri.split(srch+'=')
+    val=val[1].split(',')
+    ival=int(val[0])
+  return ival
+
+def get_val_flt(srch,stri,fval):
+  if (stri.find(srch+'=')>=0):
+    val=stri.split(srch+'=')
+    val=val[1].split(',')
+    fval=float(val[0])
+  return fval
+
 def get_tacx_data(stri,offset):
   from_tacx.new_data=False
   if (stri.find('distance_travelled=')>=0):
     dst=stri.split('distance_travelled=')
     dst=dst[1].split(',')
-    spd=dst[1].split('=')
 
     idist=int(dst[0])
     if (idist<get_tacx_data.pdist):
@@ -32,42 +49,62 @@ def get_tacx_data(stri,offset):
     get_tacx_data.pdist=idist
 
     if (get_tacx_data.reset):
-      print("RESET")
       get_tacx_data.startdist=idist
       get_tacx_data.pdist=idist
       get_tacx_data.ndist=0
       get_tacx_data.reset=False
-#      get_tacx_data.tpdist=-1
 
     dist=idist+get_tacx_data.ndist+offset-get_tacx_data.startdist
 #    pri_dbg("dist={:d}  idist={:d}  ndist={:d}  offset={:d}  startdist={:d}".format(dist,idist,get_tacx_data.ndist,offset,get_tacx_data.startdist))
-    speed=float(spd[1])*3.6
+
     if (get_tacx_data.tpdist!=dist):
       from_tacx.new_data=True
     get_tacx_data.tpdist=dist
 
     from_tacx.distance=dist
-    from_tacx.speed=speed
+
+  from_tacx.speed=get_val_flt('speed',stri,get_tacx_data.speed)
+  get_tacx_data.speed=ihrt=from_tacx.speed
+
+  from_tacx.heart=get_val_int('heart_rate',stri,get_tacx_data.heart)
+  get_tacx_data.heart=ihrt=from_tacx.heart
+
+  from_tacx.cadence=get_val_int('instantaneous_cadence',stri,get_tacx_data.cadence)
+  get_tacx_data.cadence=ihrt=from_tacx.cadence
+
+  from_tacx.accu_pow=get_val_int('accumulated_power',stri,get_tacx_data.accu_pow)
+  get_tacx_data.accu_pow=ihrt=from_tacx.accu_pow
+
+  from_tacx.inst_pow=get_val_int('instantaneous_power',stri,get_tacx_data.inst_pow)
+  get_tacx_data.inst_pow=ihrt=from_tacx.inst_pow
+
 
   return from_tacx
+
 get_tacx_data.tpdist=0
+get_tacx_data.cadence=0
+get_tacx_data.accu_pow=0
+get_tacx_data.inst_pow=0
+get_tacx_data.heart=0
+get_tacx_data.speed=0
 
 ################################################################################
 # commands to tacx
 ################################################################################
 async def put_tacx_data(trainer,cmd,val,val2):
-  # handle command 'set_basic_resistance'import sys, getopt
+  # handle command 'set_basic_resistance': val=0...200, actually gives just 11 values
   if (cmd == "set_basic_resistance"):
     ival=int(val)
     pri_dbg("set_basic_resistance: " + str(ival))
     await trainer.set_basic_resistance(ival)
 
-  # handle command 'set_track_resistance'
+  # handle command 'set_track_resistance': val=slope in %, val2=rolling resistance
   elif (cmd == "set_track_resistance"):
     ival=int(val)
     pri_dbg("set_track_resistance: " + str(ival) + "  val=" + str(val2))
     await trainer.set_track_resistance(ival,float(val2))
 
+  # handle command 'set_neo_modes': val=road_surface_pattern, val2=intensity
   elif (cmd == "set_RoadSurface"):
     pri_dbg("road_surface_pattern=" + str(val) + "  intensity=" + str(val2))
     await trainer.set_neo_modes(road_surface_pattern=val,road_surface_pattern_intensity=int(val2),isokinetic_mode=False)
